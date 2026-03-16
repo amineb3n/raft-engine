@@ -13,9 +13,9 @@ use const_format::formatcp;
 use hdrhistogram::Histogram;
 use num_traits::FromPrimitive;
 use parking_lot_core::SpinWait;
-use raft::eraftpb::Entry;
 use raft_engine::internals::{EventListener, FileBlockHandle};
 use raft_engine::{Command, Config, Engine, LogBatch, MessageExt, ReadableSize, Version};
+use raft_proto::prelude::Entry;
 use rand::{thread_rng, Rng, RngCore};
 
 type WriteBatch = LogBatch;

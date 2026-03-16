@@ -5,11 +5,11 @@ use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
 use fail::FailGuard;
-use kvproto::raft_serverpb::RaftLocalState;
 use raft::eraftpb::Entry;
 use raft_engine::env::{FileSystem, ObfuscatedFileSystem};
 use raft_engine::internals::*;
 use raft_engine::*;
+use raft_proto::prelude::RaftLocalState;
 
 use crate::util::*;
 
@@ -229,7 +229,7 @@ fn test_concurrent_write_empty_log_batch() {
     let mut ctx = ConcurrentWriteContext::new(engine.clone());
 
     let some_entries = vec![
-        Entry::new(),
+        Entry::default(),
         Entry {
             index: 1,
             ..Default::default()
@@ -579,7 +579,7 @@ fn test_concurrent_write_perf_context() {
     };
 
     let some_entries = vec![
-        Entry::new(),
+        Entry::default(),
         Entry {
             index: 1,
             ..Default::default()
@@ -724,16 +724,14 @@ fn test_recycle_with_stale_logbatch_at_tail() {
     // Causing the final log file is a recycled file, containing rewritten
     // LogBatchs and end with stale LogBatchs, `Engine::open(...)` should
     // `panic` when recovering the relate `Memtable`.
-    assert!(
-        catch_unwind_silent(|| {
-            let cfg_v2 = Config {
-                format_version: Version::V2,
-                ..cfg_err
-            };
-            Engine::open(cfg_v2)
-        })
-        .is_err()
-    );
+    assert!(catch_unwind_silent(|| {
+        let cfg_v2 = Config {
+            format_version: Version::V2,
+            ..cfg_err
+        };
+        Engine::open(cfg_v2)
+    })
+    .is_err());
 }
 
 #[test]

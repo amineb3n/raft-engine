@@ -49,6 +49,7 @@ mod filter;
 mod fork;
 mod log_batch;
 mod memtable;
+mod message;
 mod metrics;
 mod pipe_log;
 mod purge;
@@ -65,7 +66,8 @@ pub use config::{Config, RecoveryMode};
 pub use engine::Engine;
 pub use errors::{Error, Result};
 pub use log_batch::{Command, LogBatch, MessageExt};
-pub use metrics::{PerfContext, get_perf_context, set_perf_context, take_perf_context};
+pub use message::Message;
+pub use metrics::{get_perf_context, set_perf_context, take_perf_context, PerfContext};
 pub use pipe_log::Version;
 pub use util::ReadableSize;
 
@@ -216,7 +218,7 @@ pub(crate) fn is_internal_key(s: &[u8], ext: Option<&[u8]>) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::log_batch::MessageExt;
-    use raft::eraftpb::Entry;
+    use raft_proto::prelude::Entry;
 
     #[ctor::ctor]
     fn init() {

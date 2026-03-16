@@ -10,14 +10,14 @@ use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
 use log::error;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use protobuf::Message;
+use raft_proto::protocompat::PbMessageExt;
 
 use crate::codec::{self, NumberEncoder};
 use crate::memtable::EntryIndex;
 use crate::metrics::StopWatch;
 use crate::pipe_log::{FileBlockHandle, FileId, LogFileContext, ReactiveBytes};
 use crate::util::{crc32, lz4};
-use crate::{Error, Result, perf_context};
+use crate::{Error, Message, Result, perf_context};
 
 pub(crate) const LOG_BATCH_HEADER_LEN: usize = 16;
 pub(crate) const LOG_BATCH_CHECKSUM_LEN: usize = 4;
@@ -663,7 +663,7 @@ impl LogBatch {
         })();
         for e in entries {
             let buf_offset = self.buf.len();
-            e.write_to_vec(&mut self.buf)?;
+            e.write_to_vec_compat(&mut self.buf)?;
             if self.buf.len() > max_entries_size + LOG_BATCH_HEADER_LEN {
                 self.buf.truncate(old_buf_len);
                 self.buf_state = BufState::Open;
@@ -1116,8 +1116,7 @@ mod tests {
     use super::*;
     use crate::pipe_log::{LogQueue, Version};
     use crate::test_util::{catch_unwind_silent, generate_entries, generate_entry_indexes_opt};
-    use protobuf::parse_from_bytes;
-    use raft::eraftpb::Entry;
+    use raft_proto::prelude::Entry;
     use strum::IntoEnumIterator;
 
     fn decode_entries_from_bytes<M: MessageExt>(
@@ -1131,7 +1130,7 @@ mod tests {
                 LogBatch::decode_entries_block(buf, ei.entries.unwrap(), ei.compression_type)
                     .unwrap();
             entries.push(
-                parse_from_bytes(
+                M::Entry::parse_from_bytes(
                     &block[ei.entry_offset as usize..(ei.entry_offset + ei.entry_len) as usize],
                 )
                 .unwrap(),
@@ -1575,7 +1574,11 @@ mod tests {
         ));
         assert!(matches!(
             batch
-                .put_message(0, crate::make_internal_key(ATOMIC_GROUP_KEY), &Entry::new())
+                .put_message(
+                    0,
+                    crate::make_internal_key(ATOMIC_GROUP_KEY),
+                    &Entry::default()
+                )
                 .unwrap_err(),
             Error::InvalidArgument(_)
         ));

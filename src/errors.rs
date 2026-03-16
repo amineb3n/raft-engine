@@ -6,6 +6,7 @@ use std::io::Error as IoError;
 use thiserror::Error;
 
 use crate::codec::Error as CodecError;
+use raft_proto::protocompat::PbError;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -17,8 +18,11 @@ pub enum Error {
     Io(#[from] IoError),
     #[error("Codec Error: {0}")]
     Codec(#[from] CodecError),
-    #[error("Protobuf Error: {0}")]
-    Protobuf(#[from] protobuf::ProtobufError),
+    #[error("protobuf codec error {0:?}")]
+    CodecError(#[from] PbError),
+    #[cfg(feature = "prost-codec")]
+    #[error("Prost encode error: {0}")]
+    ProstEncodeError(String),
     #[error("TryAgain Error: {0}")]
     TryAgain(String),
     #[error("Entry Compacted")]

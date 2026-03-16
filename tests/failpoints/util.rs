@@ -1,7 +1,7 @@
 // Copyright (c) 2017-present, PingCAP, Inc. Licensed under Apache-2.0.
 
 use std::panic::{self, AssertUnwindSafe};
-use std::sync::{Arc, mpsc};
+use std::sync::{mpsc, Arc};
 
 use raft::eraftpb::Entry;
 use raft_engine::env::FileSystem;
@@ -18,7 +18,7 @@ impl MessageExt for MessageExtTyped {
 }
 
 pub fn generate_entries(begin_index: u64, end_index: u64, data: Option<&[u8]>) -> Vec<Entry> {
-    let mut v = vec![Entry::new(); (end_index - begin_index) as usize];
+    let mut v = vec![Entry::default(); (end_index - begin_index) as usize];
     let mut index = begin_index;
     for e in v.iter_mut() {
         e.set_index(index);

@@ -8,7 +8,7 @@ use std::thread::{Builder as ThreadBuilder, JoinHandle};
 use std::time::{Duration, Instant};
 
 use log::{error, info};
-use protobuf::{Message, parse_from_bytes};
+use raft_proto::protocompat::*;
 
 use crate::config::{Config, RecoveryMode};
 use crate::consistency::ConsistencyChecker;
@@ -22,7 +22,7 @@ use crate::metrics::*;
 use crate::pipe_log::{FileBlockHandle, FileId, LogQueue, PipeLog};
 use crate::purge::{PurgeHook, PurgeManager};
 use crate::write_barrier::{WriteBarrier, Writer};
-use crate::{Error, GlobalStats, Result, perf_context};
+use crate::{Error, GlobalStats, Message, Result, perf_context};
 
 const METRICS_FLUSH_INTERVAL: Duration = Duration::from_secs(30);
 /// Max times for `write`.
@@ -241,7 +241,7 @@ where
         let _t = StopWatch::new(&*ENGINE_READ_MESSAGE_DURATION_HISTOGRAM);
         if let Some(memtable) = self.memtables.get(region_id) {
             if let Some(value) = memtable.read().get(key) {
-                return Ok(Some(parse_from_bytes(&value)?));
+                return Ok(Some(S::parse_from_bytes(&value)?));
             }
         }
         Ok(None)
@@ -270,7 +270,7 @@ where
         C: FnMut(&[u8], S) -> bool,
     {
         self.scan_raw_messages(region_id, start_key, end_key, reverse, move |k, raw_v| {
-            if let Ok(v) = parse_from_bytes(raw_v) {
+            if let Ok(v) = S::parse_from_bytes(raw_v) {
                 callback(k, v)
             } else {
                 true
@@ -616,7 +616,7 @@ where
                 )?,
             );
         }
-        let e = parse_from_bytes(
+        let e = M::Entry::parse_from_bytes(
             &cache.block.borrow()
                 [idx.entry_offset as usize..(idx.entry_offset + idx.entry_len) as usize],
         )?;
@@ -655,8 +655,7 @@ pub(crate) mod tests {
     use crate::pipe_log::Version;
     use crate::test_util::{PanicGuard, generate_entries};
     use crate::util::ReadableSize;
-    use kvproto::raft_serverpb::RaftLocalState;
-    use raft::eraftpb::Entry;
+    use raft_proto::prelude::{Entry, RaftLocalState};
     use rand::{Rng, thread_rng};
     use std::collections::{BTreeSet, HashSet};
     use std::fs::OpenOptions;
@@ -1419,13 +1418,13 @@ pub(crate) mod tests {
                 .unwrap();
 
         let mut log_batch = LogBatch::default();
-        let empty_entry = Entry::new();
+        let empty_entry = Entry::default();
         assert_eq!(empty_entry.compute_size(), 0);
         log_batch
             .add_entries::<Entry>(0, std::slice::from_ref(&empty_entry))
             .unwrap();
         engine.write(&mut log_batch, false).unwrap();
-        let empty_state = RaftLocalState::new();
+        let empty_state = RaftLocalState::default();
         assert_eq!(empty_state.compute_size(), 0);
         log_batch
             .put_message(1, b"key".to_vec(), &empty_state)

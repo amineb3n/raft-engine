@@ -1,8 +1,7 @@
 // Copyright (c) 2017-present, PingCAP, Inc. Licensed under Apache-2.0.
 
-use kvproto::raft_serverpb::RaftLocalState;
-use raft::eraftpb::Entry;
 use raft_engine::{Config, Engine, LogBatch, MessageExt, ReadableSize};
+use raft_proto::prelude::{Entry, RaftLocalState};
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 
@@ -42,7 +41,7 @@ fn main() {
         .map(|x| x as u64);
 
     let mut batch = LogBatch::with_capacity(256);
-    let mut entry = Entry::new();
+    let mut entry = Entry::default();
     entry.set_data(vec![b'x'; 1024 * 32].into());
     let init_state = RaftLocalState {
         last_index: 0,
