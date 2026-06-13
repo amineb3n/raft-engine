@@ -139,8 +139,18 @@ where
     /// Writes the content of `log_batch` into the engine and returns written
     /// bytes. If `sync` is true, the write will be followed by a call to
     /// `fdatasync` on the log file.
+    ///
+    /// An empty `log_batch` short-circuits the write machinery; if `sync` is
+    /// also requested in that case, [`Engine::sync`] is invoked so the caller
+    /// still gets the durability guarantee they asked for.
     pub fn write(&self, log_batch: &mut LogBatch, mut sync: bool) -> Result<usize> {
         if log_batch.is_empty() {
+            if sync {
+                // Honour the explicit sync request. Without this, callers
+                // (notably Engine::sync, which passes an empty batch with
+                // sync=true) would silently skip fsync — see #395.
+                self.sync()?;
+            }
             return Ok(0);
         }
         let start = Instant::now();
@@ -231,10 +241,19 @@ where
         Ok(len)
     }
 
-    /// Synchronizes the Raft engine.
+    /// Synchronizes the Raft engine by issuing an `fdatasync` on the active
+    /// log queue. This flushes any previously-appended writes to durable
+    /// storage even when there is no new data to write.
+    ///
+    /// Note: sync errors from `pipe_log.sync(LogQueue::Append)` propagate to
+    /// the caller via `Err` here, but the same underlying call inside the
+    /// non-empty `Engine::write` path is invoked through `.expect()` and
+    /// surfaces as a panic instead. Callers that need an `Err` for the sync
+    /// step should drive durability through `Engine::sync` (or
+    /// `Engine::write` with an empty `LogBatch` and `sync=true`) rather than
+    /// relying on the in-write sync hop.
     pub fn sync(&self) -> Result<()> {
-        self.write(&mut LogBatch::default(), true)?;
-        Ok(())
+        self.pipe_log.sync(LogQueue::Append)
     }
 
     pub fn get_message<S: Message>(&self, region_id: u64, key: &[u8]) -> Result<Option<S>> {
@@ -2615,7 +2634,7 @@ pub(crate) mod tests {
             assert!(data.remove(&rid), "{}", rid);
             assert_eq!(engine.get(rid, &key).unwrap(), value);
         }
-        assert!(data.is_empty(), "data loss {:?}", data);
+        assert!(data.is_empty(), "data loss {data:?}");
     }
 
     #[test]
